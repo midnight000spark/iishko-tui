@@ -33,7 +33,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          scan="$RUNNER_TEMP/iishko-gitleaks"
+          temporary="$RUNNER_TEMP"
+          if [ "$RUNNER_OS" = Windows ]; then temporary="$(cygpath -u "$temporary")"; fi
+          scan="$temporary/iishko-gitleaks"
           mkdir -p "$scan"
           if [ "$RUNNER_OS" = Windows ]; then platform=windows_x64; binary=gitleaks.exe; extension=zip; else platform=linux_x64; binary=gitleaks; extension=tar.gz; fi
           archive="gitleaks_8.30.1_${platform}.${extension}"
@@ -62,8 +64,10 @@ jobs:
       - name: Scan distributable for secrets
         shell: bash
         run: |
-          if [ "$RUNNER_OS" = Windows ]; then binary=gitleaks.exe; else binary=gitleaks; fi
-          "$RUNNER_TEMP/iishko-gitleaks/$binary" dir .tmp/release --redact=100 --ignore-gitleaks-allow --no-banner --log-level warn
+          set -euo pipefail
+          temporary="$RUNNER_TEMP"
+          if [ "$RUNNER_OS" = Windows ]; then temporary="$(cygpath -u "$temporary")"; binary=gitleaks.exe; else binary=gitleaks; fi
+          "$temporary/iishko-gitleaks/$binary" dir .tmp/release --redact=100 --ignore-gitleaks-allow --no-banner --log-level warn
       - name: Windows PowerShell 5.1 installation of built payload into temporary fixture
         if: runner.os == 'Windows'
         run: bun test scripts/installer.test.ts
