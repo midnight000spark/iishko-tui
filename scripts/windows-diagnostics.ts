@@ -49,6 +49,7 @@ if (process.platform === "win32") {
     await writeFile(source, "{}")
     await ownWindowsFixture(source)
     const factory = createFileSecurityFactory({ run: async (request) => {
+      const operation = (JSON.parse(request.input) as { operation: string }).operation
       const code = Buffer.from(request.args.at(-1)!, "base64").toString("utf16le")
         .replace("$data = Microsoft.PowerShell.Utility", "[Console]::Error.WriteLine('stage-start');$data = Microsoft.PowerShell.Utility")
         .replace("$source = Read-Acl", "[Console]::Error.WriteLine('stage-input');$source = Read-Acl")
@@ -57,11 +58,21 @@ if (process.platform === "win32") {
         .replace("$owner = $source.GetOwner", "[Console]::Error.WriteLine('stage-source-read');$owner = $source.GetOwner")
         .replace("{ throw 'owner' }", "{ [Console]::Error.WriteLine('stage-owner-refused');throw 'owner' }")
         .replace("$normalized = Normalize-Acl $source", "[Console]::Error.WriteLine('stage-source');$normalized = Normalize-Acl $source")
+        .replace("Microsoft.PowerShell.Security\\Set-Acl -LiteralPath", "[Console]::Error.WriteLine('stage-setacl');Microsoft.PowerShell.Security\\Set-Acl -LiteralPath")
+        .replace("Check-Target ([string] $data.targetPath) $normalized", "[Console]::Error.WriteLine('stage-check');Check-Target ([string] $data.targetPath) $normalized")
+        .replace("{ throw 'inherited-ace' }", "{ [Console]::Error.WriteLine('stage-inherited');throw 'inherited-ace' }")
+        .replace("{ throw 'target-changed' }", "{ [Console]::Error.WriteLine('stage-mismatch');throw 'target-changed' }")
+        .replace("{ throw 'inheritance' }", "{ [Console]::Error.WriteLine('stage-unprotected');throw 'inheritance' }")
         .replace("} catch { exit 1 }", "} catch { [Console]::Error.WriteLine('stage-refused');exit 1 }")
       const revised = { ...request, args: [...request.args.slice(0, -1), Buffer.from(code, "utf16le").toString("base64")] }
-      await execute("acl-snapshot-node", revised, false).catch(() => {})
-      return execute("acl-snapshot-bun", revised, true)
+      await execute(`acl-${operation}-node`, revised, false).catch(() => {})
+      return execute(`acl-${operation}-bun`, revised, true)
     } })
-    await factory(source).then(() => console.log("acl-snapshot-success"), () => console.log("acl-snapshot-refused"))
+    const security = await factory(source)
+    const target = join(directory, "empty-target.json")
+    await writeFile(target, "")
+    await security.protect(target)
+    await security.verify()
+    console.log("acl-lifecycle-success")
   } finally { await rm(directory, { recursive: true, force: true }) }
 }

@@ -35,12 +35,14 @@ async function fixture() {
   await writeFile(join(bin, "opencode.cmd"), "@echo off\r\necho 2.2.5\r\n");
   const destination = join(config, "opencode", "plugins", "iishko-tui");
   const run = async (args: string[] = []) => {
+    const env = Object.fromEntries(Object.entries(Bun.env).filter(([key]) =>
+      !["PATH", "PATHEXT", "PSMODULEPATH", "XDG_CONFIG_HOME"].includes(key.toUpperCase())));
     const process = Bun.spawn([
       join(powershellRoot, "powershell.exe"),
       "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", join(release, "install.ps1"),
       "-ConfigHome", config, "-NonInteractive", ...args,
     ], {
-      env: { ...Bun.env, PATH: bin, PATHEXT: ".COM;.EXE;.BAT;.CMD", XDG_CONFIG_HOME: config, PSModulePath: join(powershellRoot, "Modules") },
+      env: { ...env, PATH: bin, PATHEXT: ".COM;.EXE;.BAT;.CMD", XDG_CONFIG_HOME: config, PSModulePath: join(powershellRoot, "Modules") },
       stdin: "ignore", stdout: "pipe", stderr: "pipe",
     });
     const [code, stdout, stderr] = await Promise.all([
