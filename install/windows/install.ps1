@@ -7,6 +7,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+# Never inherit PowerShell 7 or user module lookup paths through an intermediate host.
+$env:PSModulePath = Join-Path $PSHOME 'Modules'
 $ExpectedVersion = '__RELEASE_VERSION__'
 $PayloadNames = @('package.json', 'tui.js', 'THIRD-PARTY-NOTICES.txt')
 $PluginNames = @('package.json', 'tui.js', 'THIRD-PARTY-NOTICES.txt', 'release-manifest.json')

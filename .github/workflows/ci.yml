@@ -51,6 +51,9 @@ jobs:
         run: bun audit --audit-level=high
       - name: Typecheck source and release tooling
         run: bun run typecheck
+      - name: Diagnose synthetic Windows process boundaries
+        if: runner.os == 'Windows'
+        run: bun run scripts/windows-diagnostics.ts
       - name: Unit and fixture integration tests
         run: bun test
       - name: Build portable release (no environment inlining)
