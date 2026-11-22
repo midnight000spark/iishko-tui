@@ -1,0 +1,94 @@
+name: Portable plugin
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portable-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.4.4'
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+      - name: Scan checked-out source for secrets (redacted output)
+        shell: bash
+        run: |
+          set -euo pipefail
+          scan="$RUNNER_TEMP/iishko-gitleaks"
+          mkdir -p "$scan"
+          if [ "$RUNNER_OS" = Windows ]; then platform=windows_x64; binary=gitleaks.exe; extension=zip; else platform=linux_x64; binary=gitleaks; extension=tar.gz; fi
+          archive="gitleaks_8.30.1_${platform}.${extension}"
+          base=https://github.com/gitleaks/gitleaks/releases/download/v8.30.1
+          curl -fsSL --retry 3 "$base/$archive" -o "$scan/$archive"
+          curl -fsSL --retry 3 "$base/gitleaks_8.30.1_checksums.txt" -o "$scan/checksums.txt"
+          (cd "$scan" && grep " ${archive}$" checksums.txt | sha256sum -c -)
+          if [ "$extension" = zip ]; then unzip -q "$scan/$archive" "$binary" -d "$scan"; else tar -xzf "$scan/$archive" -C "$scan" "$binary"; fi
+          mkdir -p "$scan/source"
+          git archive HEAD | tar -xf - -C "$scan/source"
+          "$scan/$binary" dir "$scan/source" --redact=100 --ignore-gitleaks-allow --no-banner --log-level warn
+      - name: Dependency security scan
+        run: bun audit --audit-level=high
+      - name: Typecheck source and release tooling
+        run: bun run typecheck
+      - name: Unit and fixture integration tests
+        run: bun test
+      - name: Build portable release (no environment inlining)
+        run: bun run build
+        env:
+          IISHKO_BUILD_SECRET: IISHKO_SECRET_SENTINEL_DO_NOT_SHIP
+      - name: Verify release allowlist, hashes and external imports
+        run: bun run verify:release
+      - name: Execute actual bundle with an isolated mock host
+        run: bun run smoke:bundle
+      - name: Scan distributable for secrets
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then binary=gitleaks.exe; else binary=gitleaks; fi
+          "$RUNNER_TEMP/iishko-gitleaks/$binary" dir .tmp/release --redact=100 --ignore-gitleaks-allow --no-banner --log-level warn
+      - name: Windows PowerShell 5.1 installation of built payload into temporary fixture
+        if: runner.os == 'Windows'
+        run: bun test scripts/installer.test.ts
+        env:
+          IISHKO_TEST_RELEASE: '1'
+      - name: Create transferable Windows ZIP and outer checksum
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $archive = "iishko-tui-$version-windows.zip"
+          Compress-Archive -Path .tmp/release/* -DestinationPath ".tmp/$archive"
+          $hash = (Get-FileHash ".tmp/$archive" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $archive" | Set-Content ".tmp/$archive.sha256" -Encoding ascii
+          Expand-Archive -LiteralPath ".tmp/$archive" -DestinationPath .tmp/zip-smoke
+          bun -e "import { verifyRelease } from './scripts/verify-release.ts'; await verifyRelease('.tmp/zip-smoke')"
+          if ($LASTEXITCODE -ne 0) { throw 'Extracted ZIP verification failed' }
+      - name: Upload verified Windows package
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: iishko-tui-windows
+          path: |
+            .tmp/iishko-tui-*-windows.zip
+            .tmp/iishko-tui-*-windows.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
