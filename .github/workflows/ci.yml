@@ -89,13 +89,17 @@ jobs:
           Expand-Archive -LiteralPath ".tmp/$archive" -DestinationPath .tmp/zip-smoke
           bun -e "import { verifyRelease } from './scripts/verify-release.ts'; await verifyRelease('.tmp/zip-smoke')"
           if ($LASTEXITCODE -ne 0) { throw 'Extracted ZIP verification failed' }
+          $publicArtifacts = Join-Path $env:RUNNER_TEMP 'iishko-public-artifacts'
+          New-Item -ItemType Directory -Path $publicArtifacts | Out-Null
+          Copy-Item -LiteralPath ".tmp/$archive" -Destination $publicArtifacts
+          Copy-Item -LiteralPath ".tmp/$archive.sha256" -Destination $publicArtifacts
       - name: Upload verified Windows package
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: iishko-tui-windows
           path: |
-            .tmp/iishko-tui-*-windows.zip
-            .tmp/iishko-tui-*-windows.zip.sha256
+            ${{ runner.temp }}/iishko-public-artifacts/iishko-tui-*-windows.zip
+            ${{ runner.temp }}/iishko-public-artifacts/iishko-tui-*-windows.zip.sha256
           if-no-files-found: error
           retention-days: 14
