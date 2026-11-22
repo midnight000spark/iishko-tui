@@ -170,6 +170,9 @@ describe("ACL subprocess boundary", () => {
 // Windows-only fixture: deliberately broad parent, restricted source, no live config/admin changes.
 const FIXTURE_SCRIPT = String.raw`
 $ErrorActionPreference = 'Stop'
+Import-Module ([IO.Path]::Combine($PSHOME, 'Modules', 'Microsoft.PowerShell.Utility')) -ErrorAction Stop
+Import-Module ([IO.Path]::Combine($PSHOME, 'Modules', 'Microsoft.PowerShell.Security')) -ErrorAction Stop
+Import-Module ([IO.Path]::Combine($PSHOME, 'Modules', 'Microsoft.PowerShell.Management')) -ErrorAction Stop
 [Console]::InputEncoding = [Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 try {
