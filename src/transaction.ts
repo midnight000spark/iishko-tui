@@ -293,6 +293,10 @@ async function execute(prepared: PreparedUpdate, expected: string, options: Appl
     parseConfig(preview.after)
     await validate(preview.after)
     abort(signal)
+    const validated = await current(preview.path, signal)
+    if (!sameFile(source.info, validated.info) || digest(validated.bytes) !== preview.beforeHash) {
+      throw new ChangedConfigError()
+    }
     const security = await (dependencies.security ?? createFileSecurity)(preview.path, signal)
     abort(signal)
     const backupPath = `${preview.path}.iishko-${randomUUID()}.bak`

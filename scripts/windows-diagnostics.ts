@@ -4,6 +4,7 @@ import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, win32 } from "node:path"
 import { createFileSecurityFactory, type AclRequest } from "../src/windows-acl.js"
+import { ownWindowsFixture } from "./windows-fixture.js"
 
 if (process.platform === "win32") {
   const root = process.env.SystemRoot!
@@ -46,6 +47,7 @@ if (process.platform === "win32") {
   try {
     const source = join(directory, "fixture.json")
     await writeFile(source, "{}")
+    await ownWindowsFixture(source)
     const factory = createFileSecurityFactory({ run: async (request) => {
       const code = Buffer.from(request.args.at(-1)!, "base64").toString("utf16le")
         .replace("$data = Microsoft.PowerShell.Utility", "[Console]::Error.WriteLine('stage-start');$data = Microsoft.PowerShell.Utility")

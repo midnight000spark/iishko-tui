@@ -7,6 +7,7 @@ import { inventory, verifyRelease } from "./verify-release";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const version = "0.1.0";
+const powershellRoot = join(Bun.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0");
 
 async function fixture() {
   const base = join(root, ".tmp", "installer-tests");
@@ -35,11 +36,11 @@ async function fixture() {
   const destination = join(config, "opencode", "plugins", "iishko-tui");
   const run = async (args: string[] = []) => {
     const process = Bun.spawn([
-      join(Bun.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+      join(powershellRoot, "powershell.exe"),
       "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", join(release, "install.ps1"),
       "-ConfigHome", config, "-NonInteractive", ...args,
     ], {
-      env: { ...Bun.env, PATH: bin, XDG_CONFIG_HOME: config },
+      env: { ...Bun.env, PATH: bin, PATHEXT: ".COM;.EXE;.BAT;.CMD", XDG_CONFIG_HOME: config, PSModulePath: join(powershellRoot, "Modules") },
       stdin: "ignore", stdout: "pipe", stderr: "pipe",
     });
     const [code, stdout, stderr] = await Promise.all([
@@ -145,7 +146,8 @@ describe.skipIf(process.platform !== "win32")("Windows PowerShell 5.1 installer 
     try {
       for (const value of ["1.9.0", "2.2.4", "unknown", "3.0.0"]) {
         await writeFile(join(f.bin, "opencode.cmd"), `@echo off\r\necho ${value}\r\n`);
-        expect((await f.run()).code).not.toBe(0);
+        const result = await f.run();
+        expect(result.code, `version ${value}: ${result.text}`).not.toBe(0);
       }
     } finally { await f.cleanup(); }
   }, 30000);

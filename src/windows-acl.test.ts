@@ -220,7 +220,7 @@ test.skipIf(process.platform !== "win32")("Windows apply preserves restricted ef
   const execute = (data: Record<string, unknown>) => run({
     executable: win32.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
     args: ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(FIXTURE_SCRIPT, "utf16le").toString("base64")],
-    input: JSON.stringify(data), env: { SystemRoot: root, WINDIR: root },
+    input: JSON.stringify(data), env: { SystemRoot: root, WINDIR: root, PSModulePath: win32.join(root, "System32", "WindowsPowerShell", "v1.0", "Modules") },
   })
   try {
     const before = '{"providers":{"account":{"models":{"old":{}}}}}'

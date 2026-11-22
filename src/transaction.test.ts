@@ -7,6 +7,7 @@ import { modelEntries, parseConfig, replaceModels } from "./config-document.js"
 import { createSchemaValidator } from "./schema.js"
 import { applyUpdate, createTransaction, prepareUpdate } from "./transaction.js"
 import type { ApplyUpdateOptions, PreparedUpdate } from "./transaction.js"
+import { ownWindowsFixture } from "../scripts/windows-fixture.js"
 
 const before = '\uFEFF{\r\n// fixture comment\r\n"providers":{"account":{"settings":{"apiKey":"fixture-only"},"models":{"old":{}}},"other":{"models":{"keep":{}}}},\r\n"theme":"keep",\r\n}\r\n'
 const after = replaceModels(before, "account", { next: { limit: { context: 100 } } })
@@ -16,7 +17,7 @@ const options: ApplyUpdateOptions = { validate: (text) => validateSchema(parseCo
 async function fixture(run: (path: string, directory: string) => Promise<void>): Promise<void> {
   const directory = await realpath(await mkdtemp(join(tmpdir(), "iishko-transaction-")))
   const path = join(directory, "local config.jsonc")
-  try { await writeFile(path, before, { mode: 0o640 }); await run(path, directory) }
+  try { await writeFile(path, before, { mode: 0o640 }); await ownWindowsFixture(path); await run(path, directory) }
   finally { await rm(directory, { recursive: true, force: true }) }
 }
 

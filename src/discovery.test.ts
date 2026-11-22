@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { configPaths, discoverAccounts } from "./discovery.js"
 
 async function fixture(run: (dir: string) => Promise<void>): Promise<void> {
-  const dir = await mkdtemp(join(tmpdir(), "iishko-discovery-"))
+  const dir = await realpath(await mkdtemp(join(tmpdir(), "iishko-discovery-")))
   try { await run(dir) } finally { await rm(dir, { recursive: true, force: true }) }
 }
 
