@@ -45,6 +45,9 @@ describe("Windows file security", () => {
       expect(script).toContain("SetAccessRuleProtection($true, $true)")
       expect(script).toContain("AreAccessRulesCanonical")
       expect(script).toContain("null-dacl")
+      expect(script).toContain("-bnot [int][Security.AccessControl.AceFlags]::Inherited")
+      expect(script).toContain("$raw.DiscretionaryAcl[$index] = $ace")
+      expect(script).toContain("$check.GetSecurityDescriptorSddlForm($sections) -cne $sddl")
       expect(script).not.toContain("Invoke-Expression")
       expect(request.env["PATH"]).toBeUndefined()
     }

@@ -42,9 +42,20 @@ function Normalize-Acl($acl) {
   $copy.SetAccessRuleProtection($true, $true)
   if (-not $copy.AreAccessRulesCanonical) { throw 'canonical' }
   $raw = [Security.AccessControl.RawSecurityDescriptor]::new($copy.GetSecurityDescriptorSddlForm($sections))
+  # .NET Framework protects the DACL but leaves ACE-level inherited markers intact.
+  # Convert only that provenance bit; never reorder ACEs or change their access masks.
+  for ($index = 0; $index -lt $raw.DiscretionaryAcl.Count; $index++) {
+    $ace = $raw.DiscretionaryAcl[$index]
+    $ace.AceFlags = [Security.AccessControl.AceFlags]([int]$ace.AceFlags -band (-bnot [int][Security.AccessControl.AceFlags]::Inherited))
+    $raw.DiscretionaryAcl[$index] = $ace
+  }
   $flags = [Security.AccessControl.ControlFlags]::DiscretionaryAclPresent -bor [Security.AccessControl.ControlFlags]::DiscretionaryAclProtected
   $normalized = [Security.AccessControl.RawSecurityDescriptor]::new($flags, $raw.Owner, $null, $null, $raw.DiscretionaryAcl)
-  return $normalized.GetSddlForm($sections)
+  $sddl = $normalized.GetSddlForm($sections)
+  $check = [Security.AccessControl.FileSecurity]::new()
+  $check.SetSecurityDescriptorSddlForm($sddl, $sections)
+  if (-not $check.AreAccessRulesCanonical -or $check.GetSecurityDescriptorSddlForm($sections) -cne $sddl) { throw 'canonical' }
+  return $sddl
 }
 function Check-Target([string] $path, [string] $normalized) {
   $acl = Read-Acl $path

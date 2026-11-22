@@ -35,7 +35,7 @@ if (process.platform === "win32") {
         child.stdin.end(request.input, "utf8")
       })
     }
-    const stages = diagnostics.match(/stage-[a-z]+/g) ?? []
+    const stages = diagnostics.match(/stage-[A-Za-z-]+/g) ?? []
     console.log(JSON.stringify({ label, code, timedOut, stages, outputBytes: Buffer.byteLength(output) }))
     if (code !== 0 || timedOut) throw new Error("synthetic diagnostic failed")
     return output
